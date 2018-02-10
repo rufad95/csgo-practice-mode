@@ -8,6 +8,7 @@
 #include <sourcemod>
 
 #undef REQUIRE_PLUGIN
+#include "../../botmimic/scripting/include/botmimic.inc"
 #include "include/csutils.inc"
 
 #include <pugsetup>
@@ -23,6 +24,7 @@
 bool g_InPracticeMode = false;
 bool g_PugsetupLoaded = false;
 bool g_CSUtilsLoaded = false;
+bool g_BotMimicLoaded = false;
 
 // These data structures maintain a list of settings for a toggle-able option:
 // the name, the cvar/value for the enabled option, and the cvar/value for the disabled option.
@@ -124,6 +126,10 @@ char g_BotSpawnWeapon[MAXPLAYERS + 1][64];
 bool g_BotCrouching[MAXPLAYERS + 1];
 int g_BotNameNumber[MAXPLAYERS + 1];
 
+bool g_BotInit = false;
+bool g_InBotReplayMode = false;
+KeyValues g_ReplaysKv;
+
 #define PLAYER_HEIGHT 72.0
 #define CLASS_LENGTH 64
 
@@ -197,6 +203,10 @@ Handle g_OnPracticeModeSettingChanged = INVALID_HANDLE;
 Handle g_OnPracticeModeSettingsRead = INVALID_HANDLE;
 
 #include "practicemode/grenadeiterators.sp"
+
+#include "practicemode/botreplay.sp"
+#include "practicemode/botreplay_data.sp"
+#include "practicemode/botreplay_editor.sp"
 
 #include "practicemode/bots.sp"
 #include "practicemode/botsmenu.sp"
@@ -371,6 +381,25 @@ public void OnPluginStart() {
 
     RegConsoleCmd("sm_botsmenu", Command_BotsMenu);
     PM_AddChatAlias(".bots", "sm_botsmenu");
+  }
+
+  // Bot replay commands
+  {
+    AddCommandListener(Command_LookAtWeapon, "+lookatweapon");
+
+    RegConsoleCmd("sm_replay", Command_Replay);
+    RegConsoleCmd("sm_replays", Command_Replays);
+    PM_AddChatAlias(".replay", "sm_replay");
+    PM_AddChatAlias(".replays", "sm_replays");
+
+    RegConsoleCmd("sm_namereplay", Command_NameReplay);
+    PM_AddChatAlias(".namereplay", "sm_namereplay");
+
+    RegConsoleCmd("sm_cancelrecording", Command_CancelRecording);
+    PM_AddChatAlias(".cancel", "sm_cancelrecording");
+
+    RegConsoleCmd("sm_finishrecording", Command_FinishRecording);
+    PM_AddChatAlias(".finish", "sm_finishrecording");
   }
 
   // Saved grenade location commands
@@ -594,6 +623,7 @@ public void OnPluginStart() {
 
   g_PugsetupLoaded = LibraryExists("pugsetup");
   g_CSUtilsLoaded = LibraryExists("csutils");
+  g_BotMimicLoaded = LibraryExists("botmimic");
 
   CreateTimer(1.0, Timer_GivePlayersMoney, _, TIMER_REPEAT);
 }
@@ -603,11 +633,14 @@ public void OnPluginEnd() {
     ExitPracticeMode();
   }
   MaybeWriteNewGrenadeData();
+  Spawns_MapEnd();
+  BotReplay_MapEnd();
 }
 
 public void OnLibraryAdded(const char[] name) {
   g_PugsetupLoaded = LibraryExists("pugsetup");
   g_CSUtilsLoaded = LibraryExists("csutils");
+  g_BotMimicLoaded = LibraryExists("botmimic");
   if (LibraryExists("updater")) {
     Updater_AddPlugin(UPDATE_URL);
   }
@@ -616,6 +649,7 @@ public void OnLibraryAdded(const char[] name) {
 public void OnLibraryRemoved(const char[] name) {
   g_PugsetupLoaded = LibraryExists("pugsetup");
   g_CSUtilsLoaded = LibraryExists("csutils");
+  g_BotMimicLoaded = LibraryExists("botmimic");
 }
 
 /**
@@ -670,6 +704,7 @@ public void OnMapStart() {
   EnforceDirectoryExists("data/practicemode/grenades");
   EnforceDirectoryExists("data/practicemode/grenades/backups");
   EnforceDirectoryExists("data/practicemode/spawns");
+  EnforceDirectoryExists("data/practicemode/replays");
 
   // This supports backwards compatability for grenades saved in the old location
   // data/practicemode_grenades. The data is transferred to the new
@@ -701,6 +736,7 @@ public void OnMapStart() {
 
   FindGrenadeCategories();
   Spawns_MapStart();
+  BotReplay_MapStart();
 }
 
 public void OnConfigsExecuted() {
@@ -761,6 +797,7 @@ public void OnMapEnd() {
   }
 
   Spawns_MapEnd();
+  BotReplay_MapEnd();
   delete g_GrenadeLocationsKv;
 }
 
@@ -886,6 +923,11 @@ public Action Command_TeamJoin(int client, const char[] command, int argc) {
     GetCmdArg(1, arg, sizeof(arg));
     int team = StringToInt(arg);
     SwitchPlayerTeam(client, team);
+
+    if (g_InBotReplayMode) {
+      CS_RespawnPlayer(client);
+    }
+
     return Plugin_Handled;
   }
 
@@ -1400,9 +1442,10 @@ bool CanStartPracticeMode(int client) {
   return CheckCommandAccess(client, "sm_prac", ADMFLAG_CHANGEMAP);
 }
 
-public void CSU_OnThrowGrenade(int client, GrenadeType grenadeType, const float origin[3],
+public void CSU_OnThrowGrenade(int entity, int client, GrenadeType grenadeType, const float origin[3],
                         const float velocity[3]) {
   g_LastGrenadeType[client] = grenadeType;
   g_LastGrenadeOrigin[client] = origin;
   g_LastGrenadeVelocity[client] = velocity;
+  Replays_OnThrowGrenade(entity, client, grenadeType, origin, velocity);
 }

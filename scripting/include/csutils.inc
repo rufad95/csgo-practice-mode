@@ -21,10 +21,13 @@ native int CSU_ThrowGrenade(int client, GrenadeType grenadeType, const float ori
 // Removes any grenades in the throw queue and any nade bot connected.
 native bool CSU_ClearGrenades();
 
+// Gets the csutils defined location that the nade bot is spawned at.
+native void CSU_GetBotPosition(float[3] origin);
+
 // When a client throws a grenade.
 // This is *not* called when the grenade came from the CSU_ThrowGrenade native.
-forward void CSU_OnThrowGrenade(int client, GrenadeType grenadeType, const float origin[3],
-                                const float velocity[3]);
+forward void CSU_OnThrowGrenade(int entity, int client, GrenadeType grenadeType,
+                                const float origin[3], const float velocity[3]);
 
 stock bool IsGrenade(GrenadeType g) {
   return g != GrenadeType_None;

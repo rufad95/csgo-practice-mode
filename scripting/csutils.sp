@@ -43,13 +43,14 @@ public Plugin myinfo = {
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
   CreateNative("CSU_ThrowGrenade", Native_ThrowGrenade);
   CreateNative("CSU_ClearGrenades", Native_ClearGrenades);
+  CreateNative("CSU_GetBotPosition", Native_GetBotPosition);
   RegPluginLibrary("csutils");
   return APLRes_Success;
 }
 
 public void OnPluginStart() {
   g_OnGrenadeThrownForward = CreateGlobalForward(
-      "CSU_OnThrowGrenade", ET_Ignore, Param_Cell, Param_Cell, Param_Array,
+      "CSU_OnThrowGrenade", ET_Ignore, Param_Cell, Param_Cell, Param_Cell, Param_Array,
       Param_Array);
   HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
   HookEvent("player_spawn", Event_PlayerSpawn);
@@ -163,6 +164,10 @@ public int Native_ClearGrenades(Handle plugin, int numParams) {
   if (IsNadeBot(g_NadeBot)) {
     KickClient(g_NadeBot);
   }
+}
+
+public int Native_GetBotPosition(Handle plugin, int numParams) {
+  SetNativeArray(1, g_BotSpawnPoint, 3);
 }
 
 bool IsNadeBot(int client) {
@@ -279,6 +284,7 @@ public void OnGrenadeProjectileCreated(int entity) {
       Entity_GetLocalVelocity(entity, velocity);
 
       Call_StartForward(g_OnGrenadeThrownForward);
+      Call_PushCell(entity);
       Call_PushCell(client);
       Call_PushCell(grenadeType);
       Call_PushArray(origin, 3);
