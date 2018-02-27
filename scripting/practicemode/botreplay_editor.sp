@@ -373,8 +373,7 @@ public int ReplayRoleNadesMenuHandler(Menu menu, MenuAction action, int param1, 
     TeleportEntity(client, personOrigin, personAngles, NULL_VECTOR);
 
     // TODO: de-dupliate with TeleportToSavedGrenadePosition.
-    if (type != GrenadeType_None && GetCookieBool(client, g_UseGrenadeOnNadeMenuSelectCookie,
-                                                  USE_GRENADE_ON_NADE_MENU_SELECT_DEFAULT)) {
+    if (type != GrenadeType_None && GetSetting(client, UserSetting_SwitchToNadeOnSelect)) {
       char weaponName[64];
       GetGrenadeWeapon(type, weaponName, sizeof(weaponName));
       FakeClientCommand(client, "use %s", weaponName);
