@@ -204,6 +204,8 @@ Handle g_OnPracticeModeEnabled = INVALID_HANDLE;
 Handle g_OnPracticeModeSettingChanged = INVALID_HANDLE;
 Handle g_OnPracticeModeSettingsRead = INVALID_HANDLE;
 
+#define CHICKEN_MODEL "models/chicken/chicken.mdl"
+
 #include "practicemode/grenadeiterators.sp"
 
 #include "practicemode/botreplay.sp"
@@ -267,6 +269,8 @@ public void OnPluginStart() {
   HookEvent("flashbang_detonate", Event_FlashDetonate);
   HookEvent("smokegrenade_detonate", Event_SmokeDetonate);
   HookEvent("player_blind", Event_PlayerBlind);
+
+  PrecacheModel(CHICKEN_MODEL, true);
 
   for (int i = 0; i <= MAXPLAYERS; i++) {
     g_GrenadeHistoryPositions[i] = new ArrayList(3);
